@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gundam Terminal Cipher</title>
+
+<style>
+html, body {
+  margin: 0;
+  padding: 1ch; /* updated */
+  font-family: "Courier New", monospace;
+  background: #010;
+  color: #0f0;
+  line-height: 1.2;
+  user-select: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  text-shadow: 0 0 2px #0f0, 0 0 4px #0f0;
+}
+
+/* Terminal lines */
+.terminal-line {
+  display: block;
+  white-space: pre-wrap; /* wrap long lines */
+  animation: flicker 2s infinite alternate;
+}
+
+/* Centered header lines */
+.centered {
+  text-align: center;
+  animation: none; /* remove flicker/typewriter effect */
+}
+
+/* Editable placeholders */
+.input-placeholder {
+  display: inline-block;
+  min-width: 2ch;
+  border-bottom: 1px dashed #0f0;
+  padding: 0 2px;
+}
+
+/* Cipher text block matches boot style */
+#message-block {
+  white-space: pre-wrap; /* wrap long cipher text */
+  max-width: 100%;
+  margin-top: 10px;
+  word-wrap: break-word;
+  display: block;
+  animation: flicker 2s infinite alternate;
+  text-shadow: 0 0 2px #0f0, 0 0 4px #0f0;
+}
+@keyframes flicker {
+  0%,19%,21%,23%,25%,54%,56%,100% { opacity: 1; }
+  20%,22%,24%,55% { opacity: 0.5; }
+}
+</style>
+</head>
+
+<body>
+
+<div id="terminal"></div>
+
+<script>
+/* =========================
+   Cipher Configuration
+========================= */
+const MOD = 29n;
+const BASE_ALPHABET = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ ,."];
+const CIPHER_TEXT =
+"TGVN,XOWVTHNVA, SDV IGFV OGVNT X,EGFVLSOWNVEHMVHOVPTGVM  O,HWTP.VSVBS,SEHOVISMBHFGVTGVRS,DGEVRHPTV SPTVSOEVTXOWGFVUS,SOAGEVUZVLSHPT.VPTGVAHPZVDOGRVTHNVIHWH,VSOEVLG,PVNSLGFVSPVOHWTP.VGMBPZVNPFGGPNVNHWTGEVSNVTGVEGBSFPGEVP VNGFIGVSVYXHGPVAS,,V LVEXPZ.VS,,GZNVFGMGMUGFGEVTHNVNMH,GVTHNVMGFAZVTHNVNPGG,VFGN I,G.VL FVO RVTGVRSNVW OGVUXPVTHNVBF MHNGVFGMSHOGE.VPTGVM  OVRHPOGNNVSOEVU,GNNGEVTHNVFHWTPG XNVBSPT.";
+
+const terminal = document.getElementById("terminal");
+
+/* =========================
+   Boot Sequence
+========================= */
+const bootLines = [
+  "PROJECT SUNDIAL UNIFIED OPERATING SYSTEM",
+  "COPYRIGHT 2026 GUNDAM INDUSTRIES",
+  "-Trespasser Management System-",
+  "====================================================",
+  "| Administrator Log:",
+  "| >> Encryption Key: ■■■",
+  "| >> Keyword: ■■■■■■■■■■",
+  "====================================================",
+  "> run:// calcs E:\\message.txt /P eveveryone:f",
+  "> run:// -encrypt message.txt",
+  "====================================================",
+  "| User Log:",
+  "| >> Decryption Key: ■■■",
+  "| >> Keyword: ■■■■■■■■■■",
+  "====================================================",
+  "> LOG: Please enter correct decryption key and keyword for access..."
+];
+
+/* =========================
+   Render decrypted output
+========================= */
+function renderMessage(text) {
+  let block = document.getElementById("message-block");
+  if (!block) {
+    block = document.createElement("div");
+    block.id = "message-block";
+    block.className = "terminal-line"; // same style as boot sequence
+    terminal.appendChild(block);
+  }
+  block.textContent = text;
+}
+
+/* =========================
+   Decryption logic
+========================= */
+function update() {
+  const keyEl = document.getElementById("user-key");
+  const kwEl  = document.getElementById("user-keyword");
+  if (!keyEl || !kwEl) return;
+
+  const keyVal = keyEl.textContent.trim() || "0";
+  const kwVal  = kwEl.textContent.trim().toUpperCase();
+
+  const key = BigInt(keyVal);
+
+  const seen = new Set();
+  const keyChars = [...kwVal].filter(c =>
+    BASE_ALPHABET.includes(c) && !seen.has(c) && seen.add(c)
+  );
+
+  const cipherAlphabet = [
+    ...keyChars,
+    ...BASE_ALPHABET.filter(c => !keyChars.includes(c))
+  ];
+
+  let output = "";
+  for (const char of CIPHER_TEXT) {
+    const idx = cipherAlphabet.indexOf(char);
+    if (idx === -1) output += char;
+    else output += BASE_ALPHABET[Number((BigInt(idx) ** key) % MOD)] || char;
+  }
+
+  renderMessage(output);
+}
+
+/* =========================
+   Scale font based on longest boot line
+========================= */
+function scaleFont() {
+  const tempSpan = document.createElement("span");
+  tempSpan.style.position = "absolute";
+  tempSpan.style.visibility = "hidden";
+  tempSpan.style.whiteSpace = "pre";
+  document.body.appendChild(tempSpan);
+
+  let longestWidth = 0;
+  bootLines.forEach(line => {
+    tempSpan.textContent = line;
+    const w = tempSpan.offsetWidth;
+    if (w > longestWidth) longestWidth = w;
+  });
+
+  document.body.removeChild(tempSpan);
+
+  const viewportWidth = window.innerWidth - 40;
+  const defaultFontSize = 16;
+  const scaleFactor = viewportWidth / longestWidth;
+  const newFontSize = Math.min(defaultFontSize * scaleFactor, defaultFontSize);
+  document.body.style.fontSize = newFontSize + "px";
+}
+
+/* =========================
+   Typewriter effect + boot
+========================= */
+async function runBoot() {
+  scaleFont(); // initial scaling
+
+  // Render first three lines instantly and centered
+  for (let i = 0; i < 3; i++) {
+    const span = document.createElement("span");
+    span.className = "terminal-line centered";
+    span.textContent = bootLines[i];
+    terminal.appendChild(span);
+  }
+
+  // Type out the rest of the boot sequence with 25ms interval
+  for (let i = 3; i < bootLines.length; i++) {
+    await new Promise(resolve => {
+      const span = document.createElement("span");
+      span.className = "terminal-line";
+      terminal.appendChild(span);
+      let j = 0;
+      const timer = setInterval(() => {
+        span.textContent += bootLines[i][j++];
+        if (j >= bootLines[i].length) {
+          clearInterval(timer);
+          resolve();
+        }
+      }, 25); // updated interval
+    });
+  }
+
+  enableInputs(); // attach inputs + render cipher text
+}
+
+/* =========================
+   Attach User Inputs ONLY
+========================= */
+function enableInputs() {
+  const lines = terminal.querySelectorAll(".terminal-line");
+  let userLogStarted = false;
+
+  lines.forEach(line => {
+    if (line.textContent.includes("| User Log:")) userLogStarted = true;
+
+    if (userLogStarted) {
+      if (line.textContent.includes("| >> Decryption Key:")) {
+        line.textContent = "| >> Decryption Key: ";
+        const s = document.createElement("span");
+        s.id = "user-key";
+        s.className = "input-placeholder";
+        s.contentEditable = true;
+        s.textContent = "45";
+        s.addEventListener("input", update);
+        line.appendChild(s);
+      }
+
+      if (line.textContent.includes("| >> Keyword:")) {
+        line.textContent = "| >> Keyword: ";
+        const s = document.createElement("span");
+        s.id = "user-keyword";
+        s.className = "input-placeholder";
+        s.contentEditable = true;
+        s.textContent = "BAMBOOZLE SWIPE";
+        s.addEventListener("input", update);
+        line.appendChild(s);
+      }
+    }
+  });
+
+  update(); // render cipher text immediately
+}
+
+runBoot();
+
+/* =========================
+   Dynamically rescale on window resize
+========================= */
+window.addEventListener("resize", () => {
+  scaleFont();
+  update();
+});
+</script>
+
+</body>
+</html>

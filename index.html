@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gundam Terminal Cipher</title>
 
 <style>
 html, body {
   margin: 0;
-  padding: 0;
+  padding: 1ch;
   font-family: "Courier New", monospace;
   background: #010;
   color: #0f0;
@@ -17,11 +17,6 @@ html, body {
   overflow-y: auto;
   overflow-x: hidden;
   text-shadow: 0 0 2px #0f0, 0 0 4px #0f0;
-  font-size: calc(1.2vw + 1px); /* scales with viewport width */
-}
-
-#terminal {
-  padding: 1ch;
 }
 
 .terminal-line {
@@ -76,44 +71,63 @@ html, body {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }
 }
+
+#hidden-input {
+  position: fixed;
+  opacity: 0;
+  pointer-events: none;
+}
 </style>
 </head>
 
 <body>
 
 <div id="terminal"></div>
+<input id="hidden-input" autocomplete="off">
 
 <script>
 const MOD = 29n;
 const BASE_ALPHABET = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ ,."];
 const CIPHER_TEXT =
 "TGVN,XOWVTHNVA, SDV IGFV OGVNT X,EGFVLSOWNVEHMVHOVPTGVM  O,HWTP.VSVBS,SEHOVISMBHFGVTGVRS,DGEVRHPTV SPTVSOEVTXOWGFVUS,SOAGEVUZVLSHPT.VPTGVAHPZVDOGRVTHNVIHWH,VSOEVLG,PVNSLGFVSPVOHWTP.VGMBPZVNPFGGPNVNHWTGEVSNVTGVEGBSFPGEVP VNGFIGVSVYXHGPVAS,,V LVEXPZ.VS,,GZNVFGMGMUGFGEVTHNVNMH,GVTHNVMGFAZVTHNVNPGG,VFGN I,G.VL FVO RVTGVRSNVW OGVUXPVTHNVBF MHNGVFGMSHOGE.VPTGVM  OVRHPOGNNVSOEVU,GNNGEVTHNVFHWTPG XNVBSPT.";
+
 const ENCRYPTION_KEY = 23n;
 const CORRECT_KEYWORD = "SUNBLOCKER";
 
-// modular inverse
+// modular inverse function
 function modInverse(a, m) {
-  a = BigInt(a); m = BigInt(m);
-  let m0 = m, t, q, x0 = 0n, x1 = 1n;
+  a = BigInt(a);
+  m = BigInt(m);
+  let m0 = m, t, q;
+  let x0 = 0n, x1 = 1n;
+
   if (m === 1n) return 0n;
+
   while (a > 1n) {
-    q = a / m; t = m;
-    m = a % m; a = t;
-    t = x0; x0 = x1 - q * x0; x1 = t;
+    q = a / m;
+    t = m;
+    m = a % m;
+    a = t;
+    t = x0;
+    x0 = x1 - q * x0;
+    x1 = t;
   }
+
   if (x1 < 0n) x1 += m0;
+
   return x1;
 }
 
 const DECRYPTION_KEY = modInverse(ENCRYPTION_KEY, MOD - 1n);
 
 const terminal = document.getElementById("terminal");
+const hiddenInput = document.getElementById("hidden-input");
 
 let activeField = null;
 let locked = false;
 
 const bootLines = [
-  "************* PROJECT SUNDIAL UNIFIED OPERATING SYSTEM *************",
+  "PROJECT SUNDIAL UNIFIED OPERATING SYSTEM",
   "COPYRIGHT 2026 GUNDAM INDUSTRIES",
   "-Trespasser Management System-",
   "====================================================================",
@@ -130,7 +144,28 @@ const bootLines = [
   "> Log: Please enter correct decryption key and keyword for access..."
 ];
 
-// render decrypted text
+function scaleFont() {
+  const temp = document.createElement("span");
+  temp.style.position = "absolute";
+  temp.style.visibility = "hidden";
+  temp.style.whiteSpace = "pre";
+  document.body.appendChild(temp);
+
+  let longest = 0;
+  bootLines.forEach(line => {
+    temp.textContent = line;
+    longest = Math.max(longest, temp.offsetWidth);
+  });
+
+  document.body.removeChild(temp);
+
+  const viewport = window.innerWidth - 40;
+  const base = 16;
+  const scale = viewport / longest;
+  document.body.style.fontSize =
+    Math.min(base * scale, base) + "px";
+}
+
 function renderMessage(text) {
   let block = document.getElementById("message-block");
   if (!block) {
@@ -142,7 +177,6 @@ function renderMessage(text) {
   block.textContent = text;
 }
 
-// main decryption logic
 function update() {
   const keyEl = document.getElementById("user-key");
   const kwEl  = document.getElementById("user-keyword");
@@ -183,48 +217,46 @@ function lockInputs() {
     span.style.cursor = "default";
     span.onclick = null;
   });
+  hiddenInput.blur();
 }
 
-// Activate fake input and clear placeholder
-function activateField(span) {
-  if (locked) return;
-
-  document.querySelectorAll(".input-placeholder").forEach(el => el.classList.remove("active"));
-  span.classList.add("active");
-  activeField = span;
-
-  // Clear placeholder text only if it has the default value
-  const defaults = {
-    "user-key": "1942",
-    "user-keyword": "BAMBOOZLE SWIPE"
-  };
-  if (span.textContent === defaults[span.id]) {
-    span.textContent = "";
-  }
-}
-
-// Capture keyboard input globally
-window.addEventListener("keydown", (e) => {
+hiddenInput.addEventListener("input", () => {
   if (!activeField || locked) return;
 
-  if (e.key === "Backspace") {
-    e.preventDefault();
-    activeField.textContent = activeField.textContent.slice(0, -1);
-    update();
-    return;
+  if (activeField.id === "user-key") {
+    hiddenInput.value = hiddenInput.value.replace(/\D+/g, "");
   }
 
-  let char = e.key;
+  if (activeField.id === "user-keyword") {
+    hiddenInput.value = hiddenInput.value
+      .toUpperCase()
+      .replace(/[^A-Z ,\.]/g, "");
+  }
 
-  if (activeField.id === "user-key" && !/^\d$/.test(char)) return;
-  if (activeField.id === "user-keyword" && !/^[A-Za-z ,.]+$/.test(char)) return;
-
-  activeField.textContent += (activeField.id === "user-keyword" ? char.toUpperCase() : char);
+  activeField.textContent = hiddenInput.value;
   update();
 });
 
-// boot sequence
+function activateField(span, type) {
+  if (locked) return;
+
+  document.querySelectorAll(".input-placeholder")
+    .forEach(el => el.classList.remove("active"));
+
+  span.classList.add("active");
+  activeField = span;
+
+  hiddenInput.type = type === "key" ? "tel" : "text";
+  
+  // clear previous input every time user selects
+  hiddenInput.value = "";
+  span.textContent = "";
+  hiddenInput.focus();
+}
+
 async function runBoot() {
+  scaleFont();
+
   for (let i = 0; i < 3; i++) {
     const s = document.createElement("span");
     s.className = "terminal-line centered";
@@ -240,4 +272,52 @@ async function runBoot() {
       let j = 0;
       const t = setInterval(() => {
         s.textContent += bootLines[i][j++];
-        if (j >= bootLines
+        if (j >= bootLines[i].length) {
+          clearInterval(t);
+          r();
+        }
+      }, 25);
+    });
+  }
+
+  enableInputs();
+}
+
+function enableInputs() {
+  const lines = terminal.querySelectorAll(".terminal-line");
+  let active = false;
+
+  lines.forEach(line => {
+    if (line.textContent.includes("| User Log")) active = true;
+    if (!active) return;
+
+    if (line.textContent.includes("| >> Decryption Key:")) {
+      line.textContent = "| >> Decryption Key: ";
+      const s = document.createElement("span");
+      s.id = "user-key";
+      s.className = "input-placeholder";
+      s.textContent = "1942"; // placeholder
+      s.onclick = () => activateField(s, "key");
+      line.appendChild(s);
+    }
+
+    if (line.textContent.includes("| >> Keyword:")) {
+      line.textContent = "| >> Keyword: ";
+      const s = document.createElement("span");
+      s.id = "user-keyword";
+      s.className = "input-placeholder";
+      s.textContent = "BAMBOOZLE SWIPE"; // placeholder
+      s.onclick = () => activateField(s, "keyword");
+      line.appendChild(s);
+    }
+  });
+
+  update();
+}
+
+runBoot();
+window.addEventListener("resize", scaleFont);
+</script>
+
+</body>
+</html>

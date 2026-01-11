@@ -2,21 +2,28 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1">
+
 <title>Gundam Terminal Cipher</title>
 
 <style>
 html, body {
   margin: 0;
   padding: 1ch;
-  font-family: "Courier New", monospace;
+  font-family: "Courier New", Courier, monospace;
+  font-variant-ligatures: none;
   background: #010;
   color: #0f0;
   line-height: 1.2;
   user-select: none;
-  overflow-y: auto;
   overflow-x: hidden;
   text-shadow: 0 0 2px #0f0, 0 0 4px #0f0;
+}
+
+#terminal {
+  max-width: 100%;
+  margin: 0 auto;
 }
 
 .terminal-line {
@@ -54,11 +61,7 @@ html, body {
 
 #message-block {
   white-space: pre-wrap;
-  max-width: 100%;
   margin-top: 10px;
-  display: block;
-  word-break: break-word;
-  overflow-wrap: anywhere;
   animation: flicker 2s infinite alternate;
 }
 
@@ -94,32 +97,6 @@ const CIPHER_TEXT =
 const ENCRYPTION_KEY = 23n;
 const CORRECT_KEYWORD = "SUNBLOCKER";
 
-// modular inverse function
-function modInverse(a, m) {
-  a = BigInt(a);
-  m = BigInt(m);
-  let m0 = m, t, q;
-  let x0 = 0n, x1 = 1n;
-
-  if (m === 1n) return 0n;
-
-  while (a > 1n) {
-    q = a / m;
-    t = m;
-    m = a % m;
-    a = t;
-    t = x0;
-    x0 = x1 - q * x0;
-    x1 = t;
-  }
-
-  if (x1 < 0n) x1 += m0;
-
-  return x1;
-}
-
-const DECRYPTION_KEY = modInverse(ENCRYPTION_KEY, MOD - 1n);
-
 const terminal = document.getElementById("terminal");
 const hiddenInput = document.getElementById("hidden-input");
 
@@ -144,27 +121,33 @@ const bootLines = [
   "> Log: Please enter correct decryption key and keyword for access..."
 ];
 
-function scaleFont() {
-  const temp = document.createElement("span");
-  temp.style.position = "absolute";
-  temp.style.visibility = "hidden";
-  temp.style.whiteSpace = "pre";
-  document.body.appendChild(temp);
+/* 🔧 Dynamically lock terminal width to divider length */
+function lockTerminalWidth() {
+  const divider = bootLines
+    .filter(l => /^=+$/.test(l))
+    .sort((a, b) => b.length - a.length)[0];
 
-  let longest = 0;
-  bootLines.forEach(line => {
-    temp.textContent = line;
-    longest = Math.max(longest, temp.offsetWidth);
-  });
-
-  document.body.removeChild(temp);
-
-  const viewport = window.innerWidth - 40;
-  const base = 16;
-  const scale = viewport / longest;
-  document.body.style.fontSize =
-    Math.min(base * scale, base) + "px";
+  if (divider) {
+    terminal.style.width = divider.length + "ch";
+  }
 }
+
+function modInverse(a, m) {
+  a = BigInt(a);
+  m = BigInt(m);
+  let m0 = m, x0 = 0n, x1 = 1n;
+  if (m === 1n) return 0n;
+
+  while (a > 1n) {
+    const q = a / m;
+    [a, m] = [m, a % m];
+    [x0, x1] = [x1 - q * x0, x0];
+  }
+  if (x1 < 0n) x1 += m0;
+  return x1;
+}
+
+const DECRYPTION_KEY = modInverse(ENCRYPTION_KEY, MOD - 1n);
 
 function renderMessage(text) {
   let block = document.getElementById("message-block");
@@ -199,8 +182,9 @@ function update() {
   let output = "";
   for (const char of CIPHER_TEXT) {
     const idx = cipherAlphabet.indexOf(char);
-    if (idx === -1) output += char;
-    else output += BASE_ALPHABET[Number((BigInt(idx) ** key) % MOD)];
+    output += idx === -1
+      ? char
+      : BASE_ALPHABET[Number((BigInt(idx) ** key) % MOD)];
   }
 
   renderMessage(output);
@@ -247,15 +231,13 @@ function activateField(span, type) {
   activeField = span;
 
   hiddenInput.type = type === "key" ? "tel" : "text";
-  
-  // clear previous input every time user selects
   hiddenInput.value = "";
   span.textContent = "";
   hiddenInput.focus();
 }
 
 async function runBoot() {
-  scaleFont();
+  lockTerminalWidth();
 
   for (let i = 0; i < 3; i++) {
     const s = document.createElement("span");
@@ -296,7 +278,7 @@ function enableInputs() {
       const s = document.createElement("span");
       s.id = "user-key";
       s.className = "input-placeholder";
-      s.textContent = "1942"; // placeholder
+      s.textContent = "1942";
       s.onclick = () => activateField(s, "key");
       line.appendChild(s);
     }
@@ -306,7 +288,7 @@ function enableInputs() {
       const s = document.createElement("span");
       s.id = "user-keyword";
       s.className = "input-placeholder";
-      s.textContent = "BAMBOOZLE SWIPE"; // placeholder
+      s.textContent = "BAMBOOZLE SWIPE";
       s.onclick = () => activateField(s, "keyword");
       line.appendChild(s);
     }
@@ -316,7 +298,6 @@ function enableInputs() {
 }
 
 runBoot();
-window.addEventListener("resize", scaleFont);
 </script>
 
 </body>

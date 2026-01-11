@@ -8,7 +8,7 @@
 <style>
 html, body {
   margin: 0;
-  padding: 1ch; /* updated */
+  padding: 1ch;
   font-family: "Courier New", monospace;
   background: #010;
   color: #0f0;
@@ -19,40 +19,63 @@ html, body {
   text-shadow: 0 0 2px #0f0, 0 0 4px #0f0;
 }
 
-/* Terminal lines */
 .terminal-line {
   display: block;
-  white-space: pre-wrap; /* wrap long lines */
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   animation: flicker 2s infinite alternate;
 }
 
-/* Centered header lines */
 .centered {
   text-align: center;
-  animation: none; /* remove flicker/typewriter effect */
+  animation: none;
 }
 
-/* Editable placeholders */
 .input-placeholder {
   display: inline-block;
   min-width: 2ch;
   border-bottom: 1px dashed #0f0;
   padding: 0 2px;
+  cursor: pointer;
+  position: relative;
 }
 
-/* Cipher text block matches boot style */
+.input-placeholder.active {
+  border-bottom: 1px solid #9f9;
+  text-shadow: 0 0 6px #9f9;
+}
+
+.input-placeholder.active::after {
+  content: "▉";
+  margin-left: 2px;
+  animation: blink 1s steps(1) infinite;
+}
+
 #message-block {
-  white-space: pre-wrap; /* wrap long cipher text */
+  white-space: pre-wrap;
   max-width: 100%;
   margin-top: 10px;
-  word-wrap: break-word;
   display: block;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   animation: flicker 2s infinite alternate;
-  text-shadow: 0 0 2px #0f0, 0 0 4px #0f0;
 }
+
 @keyframes flicker {
   0%,19%,21%,23%,25%,54%,56%,100% { opacity: 1; }
   20%,22%,24%,55% { opacity: 0.5; }
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+#hidden-input {
+  position: fixed;
+  opacity: 0;
+  pointer-events: none;
 }
 </style>
 </head>
@@ -60,21 +83,49 @@ html, body {
 <body>
 
 <div id="terminal"></div>
+<input id="hidden-input" autocomplete="off">
 
 <script>
-/* =========================
-   Cipher Configuration
-========================= */
 const MOD = 29n;
 const BASE_ALPHABET = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ ,."];
 const CIPHER_TEXT =
 "TGVN,XOWVTHNVA, SDV IGFV OGVNT X,EGFVLSOWNVEHMVHOVPTGVM  O,HWTP.VSVBS,SEHOVISMBHFGVTGVRS,DGEVRHPTV SPTVSOEVTXOWGFVUS,SOAGEVUZVLSHPT.VPTGVAHPZVDOGRVTHNVIHWH,VSOEVLG,PVNSLGFVSPVOHWTP.VGMBPZVNPFGGPNVNHWTGEVSNVTGVEGBSFPGEVP VNGFIGVSVYXHGPVAS,,V LVEXPZ.VS,,GZNVFGMGMUGFGEVTHNVNMH,GVTHNVMGFAZVTHNVNPGG,VFGN I,G.VL FVO RVTGVRSNVW OGVUXPVTHNVBF MHNGVFGMSHOGE.VPTGVM  OVRHPOGNNVSOEVU,GNNGEVTHNVFHWTPG XNVBSPT.";
 
-const terminal = document.getElementById("terminal");
+const ENCRYPTION_KEY = 23n;
+const CORRECT_KEYWORD = "SUNBLOCKER";
 
-/* =========================
-   Boot Sequence
-========================= */
+// modular inverse function
+function modInverse(a, m) {
+  a = BigInt(a);
+  m = BigInt(m);
+  let m0 = m, t, q;
+  let x0 = 0n, x1 = 1n;
+
+  if (m === 1n) return 0n;
+
+  while (a > 1n) {
+    q = a / m;
+    t = m;
+    m = a % m;
+    a = t;
+    t = x0;
+    x0 = x1 - q * x0;
+    x1 = t;
+  }
+
+  if (x1 < 0n) x1 += m0;
+
+  return x1;
+}
+
+const DECRYPTION_KEY = modInverse(ENCRYPTION_KEY, MOD - 1n);
+
+const terminal = document.getElementById("terminal");
+const hiddenInput = document.getElementById("hidden-input");
+
+let activeField = null;
+let locked = false;
+
 const bootLines = [
   "PROJECT SUNDIAL UNIFIED OPERATING SYSTEM",
   "COPYRIGHT 2026 GUNDAM INDUSTRIES",
@@ -93,23 +144,39 @@ const bootLines = [
   "> Log: Please enter correct decryption key and keyword for access..."
 ];
 
-/* =========================
-   Render decrypted output
-========================= */
+function scaleFont() {
+  const temp = document.createElement("span");
+  temp.style.position = "absolute";
+  temp.style.visibility = "hidden";
+  temp.style.whiteSpace = "pre";
+  document.body.appendChild(temp);
+
+  let longest = 0;
+  bootLines.forEach(line => {
+    temp.textContent = line;
+    longest = Math.max(longest, temp.offsetWidth);
+  });
+
+  document.body.removeChild(temp);
+
+  const viewport = window.innerWidth - 40;
+  const base = 16;
+  const scale = viewport / longest;
+  document.body.style.fontSize =
+    Math.min(base * scale, base) + "px";
+}
+
 function renderMessage(text) {
   let block = document.getElementById("message-block");
   if (!block) {
     block = document.createElement("div");
     block.id = "message-block";
-    block.className = "terminal-line"; // same style as boot sequence
+    block.className = "terminal-line";
     terminal.appendChild(block);
   }
   block.textContent = text;
 }
 
-/* =========================
-   Decryption logic
-========================= */
 function update() {
   const keyEl = document.getElementById("user-key");
   const kwEl  = document.getElementById("user-keyword");
@@ -117,7 +184,6 @@ function update() {
 
   const keyVal = keyEl.textContent.trim() || "0";
   const kwVal  = kwEl.textContent.trim().toUpperCase();
-
   const key = BigInt(keyVal);
 
   const seen = new Set();
@@ -134,119 +200,123 @@ function update() {
   for (const char of CIPHER_TEXT) {
     const idx = cipherAlphabet.indexOf(char);
     if (idx === -1) output += char;
-    else output += BASE_ALPHABET[Number((BigInt(idx) ** key) % MOD)] || char;
+    else output += BASE_ALPHABET[Number((BigInt(idx) ** key) % MOD)];
   }
 
   renderMessage(output);
+
+  if (!locked && key === DECRYPTION_KEY && kwVal === CORRECT_KEYWORD) {
+    lockInputs();
+  }
 }
 
-/* =========================
-   Scale font based on longest boot line
-========================= */
-function scaleFont() {
-  const tempSpan = document.createElement("span");
-  tempSpan.style.position = "absolute";
-  tempSpan.style.visibility = "hidden";
-  tempSpan.style.whiteSpace = "pre";
-  document.body.appendChild(tempSpan);
-
-  let longestWidth = 0;
-  bootLines.forEach(line => {
-    tempSpan.textContent = line;
-    const w = tempSpan.offsetWidth;
-    if (w > longestWidth) longestWidth = w;
+function lockInputs() {
+  locked = true;
+  document.querySelectorAll(".input-placeholder").forEach(span => {
+    span.classList.remove("active");
+    span.style.cursor = "default";
+    span.onclick = null;
   });
-
-  document.body.removeChild(tempSpan);
-
-  const viewportWidth = window.innerWidth - 40;
-  const defaultFontSize = 16;
-  const scaleFactor = viewportWidth / longestWidth;
-  const newFontSize = Math.min(defaultFontSize * scaleFactor, defaultFontSize);
-  document.body.style.fontSize = newFontSize + "px";
+  hiddenInput.blur();
 }
 
-/* =========================
-   Typewriter effect + boot
-========================= */
-async function runBoot() {
-  scaleFont(); // initial scaling
+hiddenInput.addEventListener("input", () => {
+  if (!activeField || locked) return;
 
-  // Render first three lines instantly and centered
-  for (let i = 0; i < 3; i++) {
-    const span = document.createElement("span");
-    span.className = "terminal-line centered";
-    span.textContent = bootLines[i];
-    terminal.appendChild(span);
+  if (activeField.id === "user-key") {
+    hiddenInput.value = hiddenInput.value.replace(/\D+/g, "");
   }
 
-  // Type out the rest of the boot sequence with 25ms interval
+  if (activeField.id === "user-keyword") {
+    hiddenInput.value = hiddenInput.value
+      .toUpperCase()
+      .replace(/[^A-Z ,\.]/g, "");
+  }
+
+  activeField.textContent = hiddenInput.value;
+  update();
+});
+
+function activateField(span, type) {
+  if (locked) return;
+
+  document.querySelectorAll(".input-placeholder")
+    .forEach(el => el.classList.remove("active"));
+
+  span.classList.add("active");
+  activeField = span;
+
+  hiddenInput.type = type === "key" ? "tel" : "text";
+  
+  // clear previous input every time user selects
+  hiddenInput.value = "";
+  span.textContent = "";
+  hiddenInput.focus();
+}
+
+async function runBoot() {
+  scaleFont();
+
+  for (let i = 0; i < 3; i++) {
+    const s = document.createElement("span");
+    s.className = "terminal-line centered";
+    s.textContent = bootLines[i];
+    terminal.appendChild(s);
+  }
+
   for (let i = 3; i < bootLines.length; i++) {
-    await new Promise(resolve => {
-      const span = document.createElement("span");
-      span.className = "terminal-line";
-      terminal.appendChild(span);
+    await new Promise(r => {
+      const s = document.createElement("span");
+      s.className = "terminal-line";
+      terminal.appendChild(s);
       let j = 0;
-      const timer = setInterval(() => {
-        span.textContent += bootLines[i][j++];
+      const t = setInterval(() => {
+        s.textContent += bootLines[i][j++];
         if (j >= bootLines[i].length) {
-          clearInterval(timer);
-          resolve();
+          clearInterval(t);
+          r();
         }
-      }, 25); // updated interval
+      }, 25);
     });
   }
 
-  enableInputs(); // attach inputs + render cipher text
+  enableInputs();
 }
 
-/* =========================
-   Attach User Inputs ONLY
-========================= */
 function enableInputs() {
   const lines = terminal.querySelectorAll(".terminal-line");
-  let userLogStarted = false;
+  let active = false;
 
   lines.forEach(line => {
-    if (line.textContent.includes("| User Log")) userLogStarted = true;
+    if (line.textContent.includes("| User Log")) active = true;
+    if (!active) return;
 
-    if (userLogStarted) {
-      if (line.textContent.includes("| >> Decryption Key:")) {
-        line.textContent = "| >> Decryption Key: ";
-        const s = document.createElement("span");
-        s.id = "user-key";
-        s.className = "input-placeholder";
-        s.contentEditable = true;
-        s.textContent = "45";
-        s.addEventListener("input", update);
-        line.appendChild(s);
-      }
+    if (line.textContent.includes("| >> Decryption Key:")) {
+      line.textContent = "| >> Decryption Key: ";
+      const s = document.createElement("span");
+      s.id = "user-key";
+      s.className = "input-placeholder";
+      s.textContent = "1942"; // placeholder
+      s.onclick = () => activateField(s, "key");
+      line.appendChild(s);
+    }
 
-      if (line.textContent.includes("| >> Keyword:")) {
-        line.textContent = "| >> Keyword: ";
-        const s = document.createElement("span");
-        s.id = "user-keyword";
-        s.className = "input-placeholder";
-        s.contentEditable = true;
-        s.textContent = "BAMBOOZLE SWIPE";
-        s.addEventListener("input", update);
-        line.appendChild(s);
-      }
+    if (line.textContent.includes("| >> Keyword:")) {
+      line.textContent = "| >> Keyword: ";
+      const s = document.createElement("span");
+      s.id = "user-keyword";
+      s.className = "input-placeholder";
+      s.textContent = "BAMBOOZLE SWIPE"; // placeholder
+      s.onclick = () => activateField(s, "keyword");
+      line.appendChild(s);
     }
   });
 
-  update(); // render cipher text immediately
+  update();
 }
 
 runBoot();
-
-/* =========================
-   Dynamically rescale on window resize
-========================= */
-window.addEventListener("resize", () => {
-  scaleFont();
-  update();
-});
+window.addEventListener("resize", scaleFont);
 </script>
 
 </body>

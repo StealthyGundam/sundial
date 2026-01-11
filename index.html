@@ -2,13 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>Gundam Terminal Cipher</title>
 
 <style>
-/* Deterministic box model */
+/* Box model */
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -24,16 +23,18 @@ html, body {
   user-select: none;
   overflow-x: hidden;
   text-shadow: 0 0 2px #0f0, 0 0 4px #0f0;
+  font-size: 16px;
 }
 
-/* Terminal container */
+/* Terminal container fixed at 68 characters */
 #terminal {
+  width: 68ch;
+  max-width: 100%;
   padding: 1ch;
   margin: 0 auto;
-  max-width: 100%;
 }
 
-/* Default terminal lines CAN wrap */
+/* Terminal lines */
 .terminal-line {
   display: block;
   white-space: pre-wrap;
@@ -42,17 +43,18 @@ html, body {
   animation: flicker 2s infinite alternate;
 }
 
-/* Divider lines NEVER wrap */
+/* Divider lines never wrap */
 .no-wrap {
   white-space: pre;
 }
 
-/* Centered boot text */
+/* Centered lines */
 .centered {
   text-align: center;
   animation: none;
 }
 
+/* Input placeholders */
 .input-placeholder {
   display: inline-block;
   min-width: 2ch;
@@ -104,8 +106,7 @@ html, body {
 <script>
 const MOD = 29n;
 const BASE_ALPHABET = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ ,."];
-const CIPHER_TEXT =
-"TGVN,XOWVTHNVA, SDV IGFV OGVNT X,EGFVLSOWNVEHMVHOVPTGVM  O,HWTP.VSVBS,SEHOVISMBHFGVTGVRS,DGEVRHPTV SPTVSOEVTXOWGFVUS,SOAGEVUZVLSHPT.VPTGVAHPZVDOGRVTHNVIHWH,VSOEVLG,PVNSLGFVSPVOHWTP.VGMBPZVNPFGGPNVNHWTGEVSNVTGVEGBSFPGEVP VNGFIGVSVYXHGPVAS,,V LVEXPZ.VS,,GZNVFGMGMUGFGEVTHNVNMH,GVTHNVMGFAZVTHNVNPGG,VFGN I,G.VL FVO RVTGVRSNVW OGVUXPVTHNVBF MHNGVFGMSHOGE.VPTGVM  OVRHPOGNNVSOEVU,GNNGEVTHNVFHWTPG XNVBSPT.";
+const CIPHER_TEXT = "TGVN,XOWVTHNVA, SDV IGFV OGVNT X,EGFVLSOWNVEHMVHOVPTGVM  O,HWTP.VSVBS,SEHOVISMBHFGVTGVRS,DGEVRHPTV SPTVSOEVTXOWGFVUS,SOAGEVUZVLSHPT.VPTGVAHPZVDOGRVTHNVIHWH,VSOEVLG,PVNSLGFVSPVOHWTP.VGMBPZVNPFGGPNVNHWTGEVSNVTGVEGBSFPGEVP VNGFIGVSVYXHGPVAS,,V LVEXPZ.VS,,GZNVFGMGMUGFGEVTHNVNMH,GVTHNVMGFAZVTHNVNPGG,VFGN I,G.VL FVO RVTGVRSNVW OGVUXPVTHNVBF MHNGVFGMSHOGE.VPTGVM  OVRHPOGNNVSOEVU,GNNGEVTHNVFHWTPG XNVBSPT.";
 
 const ENCRYPTION_KEY = 23n;
 const CORRECT_KEYWORD = "SUNBLOCKER";
@@ -115,8 +116,6 @@ const hiddenInput = document.getElementById("hidden-input");
 
 let activeField = null;
 let locked = false;
-
-const BASE_FONT_SIZE = 16;
 
 const bootLines = [
   "PROJECT SUNDIAL UNIFIED OPERATING SYSTEM",
@@ -136,47 +135,11 @@ const bootLines = [
   "> Log: Please enter correct decryption key and keyword for access..."
 ];
 
-/* Dynamic width + font scaling to keep divider on one line */
-function fitTerminalToViewport() {
-  const divider = bootLines
-    .filter(l => /^=+$/.test(l))
-    .sort((a, b) => b.length - a.length)[0];
-  if (!divider) return;
-
-  const cols = divider.length;
-  terminal.style.width = cols + "ch";
-
-  const probe = document.createElement("span");
-  probe.textContent = "X";
-  probe.style.visibility = "hidden";
-  probe.style.position = "absolute";
-  terminal.appendChild(probe);
-
-  const chWidth = probe.getBoundingClientRect().width;
-  terminal.removeChild(probe);
-
-  const styles = getComputedStyle(terminal);
-  const padding =
-    parseFloat(styles.paddingLeft) +
-    parseFloat(styles.paddingRight);
-
-  const required = chWidth * cols + padding;
-  const available = window.innerWidth - 2;
-
-  const scale = available / required;
-
-  document.documentElement.style.fontSize =
-    scale < 1
-      ? Math.max(10, BASE_FONT_SIZE * scale) + "px"
-      : BASE_FONT_SIZE + "px";
-}
-
+/* Modular inverse */
 function modInverse(a, m) {
-  a = BigInt(a);
-  m = BigInt(m);
+  a = BigInt(a); m = BigInt(m);
   let m0 = m, x0 = 0n, x1 = 1n;
   if (m === 1n) return 0n;
-
   while (a > 1n) {
     const q = a / m;
     [a, m] = [m, a % m];
@@ -186,7 +149,7 @@ function modInverse(a, m) {
   return x1;
 }
 
-const DECRYPTION_KEY = modInverse(ENCRYPTION_KEY, MOD - 1n);
+const DECRYPTION_KEY = modInverse(ENCRYPTION_KEY, 29n-1n);
 
 function renderMessage(text) {
   let block = document.getElementById("message-block");
@@ -201,11 +164,11 @@ function renderMessage(text) {
 
 function update() {
   const keyEl = document.getElementById("user-key");
-  const kwEl  = document.getElementById("user-keyword");
+  const kwEl = document.getElementById("user-keyword");
   if (!keyEl || !kwEl) return;
 
   const keyVal = keyEl.textContent.trim() || "0";
-  const kwVal  = kwEl.textContent.trim().toUpperCase();
+  const kwVal = kwEl.textContent.trim().toUpperCase();
   const key = BigInt(keyVal);
 
   const seen = new Set();
@@ -221,9 +184,7 @@ function update() {
   let output = "";
   for (const char of CIPHER_TEXT) {
     const idx = cipherAlphabet.indexOf(char);
-    output += idx === -1
-      ? char
-      : BASE_ALPHABET[Number((BigInt(idx) ** key) % MOD)];
+    output += idx === -1 ? char : BASE_ALPHABET[Number((BigInt(idx) ** key) % 29n)];
   }
 
   renderMessage(output);
@@ -251,9 +212,7 @@ hiddenInput.addEventListener("input", () => {
   }
 
   if (activeField.id === "user-keyword") {
-    hiddenInput.value = hiddenInput.value
-      .toUpperCase()
-      .replace(/[^A-Z ,\.]/g, "");
+    hiddenInput.value = hiddenInput.value.toUpperCase().replace(/[^A-Z ,\.]/g, "");
   }
 
   activeField.textContent = hiddenInput.value;
@@ -262,13 +221,9 @@ hiddenInput.addEventListener("input", () => {
 
 function activateField(span, type) {
   if (locked) return;
-
-  document.querySelectorAll(".input-placeholder")
-    .forEach(el => el.classList.remove("active"));
-
+  document.querySelectorAll(".input-placeholder").forEach(el => el.classList.remove("active"));
   span.classList.add("active");
   activeField = span;
-
   hiddenInput.type = type === "key" ? "tel" : "text";
   hiddenInput.value = "";
   span.textContent = "";
@@ -276,32 +231,28 @@ function activateField(span, type) {
 }
 
 async function runBoot() {
-  fitTerminalToViewport();
-
-  for (let i = 0; i < 3; i++) {
-    const s = document.createElement("span");
-    s.className = "terminal-line centered";
+  for (let i=0;i<3;i++){
+    const s=document.createElement("span");
+    s.className="terminal-line centered";
     s.textContent = bootLines[i];
     terminal.appendChild(s);
   }
 
-  for (let i = 3; i < bootLines.length; i++) {
-    await new Promise(r => {
-      const s = document.createElement("span");
-      s.className = "terminal-line";
-      if (/^=+$/.test(bootLines[i])) {
-        s.classList.add("no-wrap");
-      }
+  for (let i=3;i<bootLines.length;i++){
+    await new Promise(r=>{
+      const s=document.createElement("span");
+      s.className="terminal-line";
+      if(/^=+$/.test(bootLines[i])) s.classList.add("no-wrap");
       terminal.appendChild(s);
 
-      let j = 0;
-      const t = setInterval(() => {
+      let j=0;
+      const t=setInterval(()=>{
         s.textContent += bootLines[i][j++];
-        if (j >= bootLines[i].length) {
+        if(j>=bootLines[i].length){
           clearInterval(t);
           r();
         }
-      }, 25);
+      },25);
     });
   }
 
@@ -310,29 +261,29 @@ async function runBoot() {
 
 function enableInputs() {
   const lines = terminal.querySelectorAll(".terminal-line");
-  let active = false;
+  let active=false;
 
-  lines.forEach(line => {
-    if (line.textContent.includes("| User Log")) active = true;
-    if (!active) return;
+  lines.forEach(line=>{
+    if(line.textContent.includes("| User Log")) active=true;
+    if(!active) return;
 
-    if (line.textContent.includes("| >> Decryption Key:")) {
-      line.textContent = "| >> Decryption Key: ";
-      const s = document.createElement("span");
-      s.id = "user-key";
-      s.className = "input-placeholder";
-      s.textContent = "1942";
-      s.onclick = () => activateField(s, "key");
+    if(line.textContent.includes("| >> Decryption Key:")){
+      line.textContent="| >> Decryption Key: ";
+      const s=document.createElement("span");
+      s.id="user-key";
+      s.className="input-placeholder";
+      s.textContent="1942";
+      s.onclick=()=>activateField(s,"key");
       line.appendChild(s);
     }
 
-    if (line.textContent.includes("| >> Keyword:")) {
-      line.textContent = "| >> Keyword: ";
-      const s = document.createElement("span");
-      s.id = "user-keyword";
-      s.className = "input-placeholder";
-      s.textContent = "BAMBOOZLE SWIPE";
-      s.onclick = () => activateField(s, "keyword");
+    if(line.textContent.includes("| >> Keyword:")){
+      line.textContent="| >> Keyword: ";
+      const s=document.createElement("span");
+      s.id="user-keyword";
+      s.className="input-placeholder";
+      s.textContent="BAMBOOZLE SWIPE";
+      s.onclick=()=>activateField(s,"keyword");
       line.appendChild(s);
     }
   });
@@ -341,7 +292,6 @@ function enableInputs() {
 }
 
 runBoot();
-window.addEventListener("resize", fitTerminalToViewport);
 </script>
 
 </body>

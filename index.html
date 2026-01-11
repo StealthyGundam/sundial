@@ -22,8 +22,8 @@ html, body {
 }
 
 #terminal {
-  max-width: 100%;
   margin: 0 auto;
+  max-width: 100%;
 }
 
 .terminal-line {
@@ -103,6 +103,8 @@ const hiddenInput = document.getElementById("hidden-input");
 let activeField = null;
 let locked = false;
 
+const BASE_FONT_SIZE = 16; // px
+
 const bootLines = [
   "PROJECT SUNDIAL UNIFIED OPERATING SYSTEM",
   "COPYRIGHT 2026 GUNDAM INDUSTRIES",
@@ -121,14 +123,37 @@ const bootLines = [
   "> Log: Please enter correct decryption key and keyword for access..."
 ];
 
-/* 🔧 Dynamically lock terminal width to divider length */
-function lockTerminalWidth() {
+/* 🔧 Dynamic width + font scaling to keep divider on one line */
+function fitTerminalToViewport() {
   const divider = bootLines
     .filter(l => /^=+$/.test(l))
     .sort((a, b) => b.length - a.length)[0];
 
-  if (divider) {
-    terminal.style.width = divider.length + "ch";
+  if (!divider) return;
+
+  const cols = divider.length;
+  terminal.style.width = cols + "ch";
+
+  // Measure character width
+  const probe = document.createElement("span");
+  probe.textContent = "X";
+  probe.style.visibility = "hidden";
+  probe.style.position = "absolute";
+  terminal.appendChild(probe);
+
+  const chWidth = probe.getBoundingClientRect().width;
+  terminal.removeChild(probe);
+
+  const required = chWidth * cols;
+  const available = window.innerWidth - 16;
+
+  let scale = available / required;
+
+  if (scale < 1) {
+    document.documentElement.style.fontSize =
+      Math.max(10, BASE_FONT_SIZE * scale) + "px";
+  } else {
+    document.documentElement.style.fontSize = BASE_FONT_SIZE + "px";
   }
 }
 
@@ -237,7 +262,7 @@ function activateField(span, type) {
 }
 
 async function runBoot() {
-  lockTerminalWidth();
+  fitTerminalToViewport();
 
   for (let i = 0; i < 3; i++) {
     const s = document.createElement("span");
@@ -298,6 +323,7 @@ function enableInputs() {
 }
 
 runBoot();
+window.addEventListener("resize", fitTerminalToViewport);
 </script>
 
 </body>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Gundam Terminal Cipher</title>
 
 <style>
@@ -17,10 +17,11 @@ html, body {
   overflow-y: auto;
   overflow-x: hidden;
   text-shadow: 0 0 2px #0f0, 0 0 4px #0f0;
+  font-size: calc(1.2vw + 1px); /* scales with viewport width */
 }
 
 #terminal {
-  padding: 1ch; /* optional inner padding */
+  padding: 1ch;
 }
 
 .terminal-line {
@@ -75,20 +76,12 @@ html, body {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }
 }
-
-/* Hidden input moved off-screen and font size >=16px to prevent mobile zoom */
-#hidden-input {
-  position: absolute;
-  left: -9999px;
-  font-size: 16px;
-}
 </style>
 </head>
 
 <body>
 
 <div id="terminal"></div>
-<input id="hidden-input" autocomplete="off">
 
 <script>
 const MOD = 29n;
@@ -115,7 +108,6 @@ function modInverse(a, m) {
 const DECRYPTION_KEY = modInverse(ENCRYPTION_KEY, MOD - 1n);
 
 const terminal = document.getElementById("terminal");
-const hiddenInput = document.getElementById("hidden-input");
 
 let activeField = null;
 let locked = false;
@@ -138,26 +130,9 @@ const bootLines = [
   "> Log: Please enter correct decryption key and keyword for access..."
 ];
 
-// scale font to fit screen width only
+// scale font (optional, already using vw)
 function scaleFont() {
-  const temp = document.createElement("span");
-  temp.style.position = "absolute";
-  temp.style.visibility = "hidden";
-  temp.style.whiteSpace = "pre";
-  document.body.appendChild(temp);
-
-  let longest = 0;
-  bootLines.forEach(line => {
-    temp.textContent = line;
-    longest = Math.max(longest, temp.offsetWidth);
-  });
-
-  document.body.removeChild(temp);
-
-  const viewportWidth = document.documentElement.clientWidth - 20; // small margin
-  const base = 16;
-  const scale = viewportWidth / longest;
-  document.body.style.fontSize = Math.min(base * scale, base) + "px";
+  // No-op; CSS handles scaling with vw
 }
 
 // render decrypted text
@@ -213,45 +188,38 @@ function lockInputs() {
     span.style.cursor = "default";
     span.onclick = null;
   });
-  hiddenInput.blur();
 }
 
-hiddenInput.addEventListener("input", () => {
+// Activate fake input
+function activateField(span) {
+  if (locked) return;
+  document.querySelectorAll(".input-placeholder").forEach(el => el.classList.remove("active"));
+  span.classList.add("active");
+  activeField = span;
+}
+
+// Capture keyboard input globally
+window.addEventListener("keydown", (e) => {
   if (!activeField || locked) return;
 
-  if (activeField.id === "user-key") {
-    hiddenInput.value = hiddenInput.value.replace(/\D+/g, "");
+  if (e.key === "Backspace") {
+    e.preventDefault();
+    activeField.textContent = activeField.textContent.slice(0, -1);
+    update();
+    return;
   }
 
-  if (activeField.id === "user-keyword") {
-    hiddenInput.value = hiddenInput.value
-      .toUpperCase()
-      .replace(/[^A-Z ,\.]/g, "");
-  }
+  let char = e.key;
 
-  activeField.textContent = hiddenInput.value;
+  if (activeField.id === "user-key" && !/^\d$/.test(char)) return;
+  if (activeField.id === "user-keyword" && !/^[A-Za-z ,.]+$/.test(char)) return;
+
+  activeField.textContent += (activeField.id === "user-keyword" ? char.toUpperCase() : char);
   update();
 });
 
-function activateField(span, type) {
-  if (locked) return;
-
-  document.querySelectorAll(".input-placeholder")
-    .forEach(el => el.classList.remove("active"));
-
-  span.classList.add("active");
-  activeField = span;
-
-  hiddenInput.type = type === "key" ? "tel" : "text";
-  hiddenInput.value = "";
-  span.textContent = "";
-  hiddenInput.focus();
-}
-
 // boot sequence
 async function runBoot() {
-  scaleFont();
-
   for (let i = 0; i < 3; i++) {
     const s = document.createElement("span");
     s.className = "terminal-line centered";
@@ -278,6 +246,7 @@ async function runBoot() {
   enableInputs();
 }
 
+// Set up fake input placeholders
 function enableInputs() {
   const lines = terminal.querySelectorAll(".terminal-line");
   let active = false;
@@ -292,7 +261,7 @@ function enableInputs() {
       s.id = "user-key";
       s.className = "input-placeholder";
       s.textContent = "1942";
-      s.onclick = () => activateField(s, "key");
+      s.onclick = () => activateField(s);
       line.appendChild(s);
     }
 
@@ -302,7 +271,7 @@ function enableInputs() {
       s.id = "user-keyword";
       s.className = "input-placeholder";
       s.textContent = "BAMBOOZLE SWIPE";
-      s.onclick = () => activateField(s, "keyword");
+      s.onclick = () => activateField(s);
       line.appendChild(s);
     }
   });
@@ -313,8 +282,6 @@ function enableInputs() {
 runBoot();
 window.addEventListener("resize", scaleFont);
 window.addEventListener("orientationchange", scaleFont);
-window.addEventListener("focusin", scaleFont);  // re-scale when keyboard opens
-window.addEventListener("focusout", scaleFont); // re-scale when keyboard closes
 </script>
 
 </body>

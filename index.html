@@ -130,11 +130,6 @@ const bootLines = [
   "> Log: Please enter correct decryption key and keyword for access..."
 ];
 
-// scale font (optional, already using vw)
-function scaleFont() {
-  // No-op; CSS handles scaling with vw
-}
-
 // render decrypted text
 function renderMessage(text) {
   let block = document.getElementById("message-block");
@@ -190,12 +185,22 @@ function lockInputs() {
   });
 }
 
-// Activate fake input
+// Activate fake input and clear placeholder
 function activateField(span) {
   if (locked) return;
+
   document.querySelectorAll(".input-placeholder").forEach(el => el.classList.remove("active"));
   span.classList.add("active");
   activeField = span;
+
+  // Clear placeholder text only if it has the default value
+  const defaults = {
+    "user-key": "1942",
+    "user-keyword": "BAMBOOZLE SWIPE"
+  };
+  if (span.textContent === defaults[span.id]) {
+    span.textContent = "";
+  }
 }
 
 // Capture keyboard input globally
@@ -235,54 +240,4 @@ async function runBoot() {
       let j = 0;
       const t = setInterval(() => {
         s.textContent += bootLines[i][j++];
-        if (j >= bootLines[i].length) {
-          clearInterval(t);
-          r();
-        }
-      }, 25);
-    });
-  }
-
-  enableInputs();
-}
-
-// Set up fake input placeholders
-function enableInputs() {
-  const lines = terminal.querySelectorAll(".terminal-line");
-  let active = false;
-
-  lines.forEach(line => {
-    if (line.textContent.includes("| User Log")) active = true;
-    if (!active) return;
-
-    if (line.textContent.includes("| >> Decryption Key:")) {
-      line.textContent = "| >> Decryption Key: ";
-      const s = document.createElement("span");
-      s.id = "user-key";
-      s.className = "input-placeholder";
-      s.textContent = "1942";
-      s.onclick = () => activateField(s);
-      line.appendChild(s);
-    }
-
-    if (line.textContent.includes("| >> Keyword:")) {
-      line.textContent = "| >> Keyword: ";
-      const s = document.createElement("span");
-      s.id = "user-keyword";
-      s.className = "input-placeholder";
-      s.textContent = "BAMBOOZLE SWIPE";
-      s.onclick = () => activateField(s);
-      line.appendChild(s);
-    }
-  });
-
-  update();
-}
-
-runBoot();
-window.addEventListener("resize", scaleFont);
-window.addEventListener("orientationchange", scaleFont);
-</script>
-
-</body>
-</html>
+        if (j >= bootLines

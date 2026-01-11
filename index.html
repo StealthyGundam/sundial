@@ -8,9 +8,14 @@
 <title>Gundam Terminal Cipher</title>
 
 <style>
+/* Deterministic box model */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 html, body {
   margin: 0;
-  padding: 1ch;
+  padding: 0;
   font-family: "Courier New", Courier, monospace;
   font-variant-ligatures: none;
   background: #010;
@@ -21,11 +26,14 @@ html, body {
   text-shadow: 0 0 2px #0f0, 0 0 4px #0f0;
 }
 
+/* Terminal container */
 #terminal {
+  padding: 1ch;
   margin: 0 auto;
   max-width: 100%;
 }
 
+/* Default terminal lines CAN wrap */
 .terminal-line {
   display: block;
   white-space: pre-wrap;
@@ -34,6 +42,12 @@ html, body {
   animation: flicker 2s infinite alternate;
 }
 
+/* Divider lines NEVER wrap */
+.no-wrap {
+  white-space: pre;
+}
+
+/* Centered boot text */
 .centered {
   text-align: center;
   animation: none;
@@ -60,7 +74,6 @@ html, body {
 }
 
 #message-block {
-  white-space: pre-wrap;
   margin-top: 10px;
   animation: flicker 2s infinite alternate;
 }
@@ -103,38 +116,36 @@ const hiddenInput = document.getElementById("hidden-input");
 let activeField = null;
 let locked = false;
 
-const BASE_FONT_SIZE = 16; // px
+const BASE_FONT_SIZE = 16;
 
 const bootLines = [
   "PROJECT SUNDIAL UNIFIED OPERATING SYSTEM",
   "COPYRIGHT 2026 GUNDAM INDUSTRIES",
   "-Trespasser Management System-",
-  "====================================================================",
+  "===============================================================",
   "| Administrator Log",
   "| >> Encryption Key: ■■■",
   "| >> Keyword: ■■■■■■■■■■",
   "> run:// calcs E:\\message.txt /P eveveryone:f",
   "> -encrypt message.txt",
-  "====================================================================",
+  "===============================================================",
   "| User Log",
   "| >> Decryption Key: ■■■",
   "| >> Keyword: ■■■■■■■■■■",
-  "====================================================================",
+  "===============================================================",
   "> Log: Please enter correct decryption key and keyword for access..."
 ];
 
-/* 🔧 Dynamic width + font scaling to keep divider on one line */
+/* Dynamic width + font scaling to keep divider on one line */
 function fitTerminalToViewport() {
   const divider = bootLines
     .filter(l => /^=+$/.test(l))
     .sort((a, b) => b.length - a.length)[0];
-
   if (!divider) return;
 
   const cols = divider.length;
   terminal.style.width = cols + "ch";
 
-  // Measure character width
   const probe = document.createElement("span");
   probe.textContent = "X";
   probe.style.visibility = "hidden";
@@ -144,17 +155,20 @@ function fitTerminalToViewport() {
   const chWidth = probe.getBoundingClientRect().width;
   terminal.removeChild(probe);
 
-  const required = chWidth * cols;
-  const available = window.innerWidth - 16;
+  const styles = getComputedStyle(terminal);
+  const padding =
+    parseFloat(styles.paddingLeft) +
+    parseFloat(styles.paddingRight);
 
-  let scale = available / required;
+  const required = chWidth * cols + padding;
+  const available = window.innerWidth - 2;
 
-  if (scale < 1) {
-    document.documentElement.style.fontSize =
-      Math.max(10, BASE_FONT_SIZE * scale) + "px";
-  } else {
-    document.documentElement.style.fontSize = BASE_FONT_SIZE + "px";
-  }
+  const scale = available / required;
+
+  document.documentElement.style.fontSize =
+    scale < 1
+      ? Math.max(10, BASE_FONT_SIZE * scale) + "px"
+      : BASE_FONT_SIZE + "px";
 }
 
 function modInverse(a, m) {
@@ -275,7 +289,11 @@ async function runBoot() {
     await new Promise(r => {
       const s = document.createElement("span");
       s.className = "terminal-line";
+      if (/^=+$/.test(bootLines[i])) {
+        s.classList.add("no-wrap");
+      }
       terminal.appendChild(s);
+
       let j = 0;
       const t = setInterval(() => {
         s.textContent += bootLines[i][j++];

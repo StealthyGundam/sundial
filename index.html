@@ -8,7 +8,7 @@
 <style>
 html, body {
   margin: 0;
-  padding: 1ch;
+  padding: 0; /* remove extra padding for full-width scaling */
   font-family: "Courier New", monospace;
   background: #010;
   color: #0f0;
@@ -17,6 +17,10 @@ html, body {
   overflow-y: auto;
   overflow-x: hidden;
   text-shadow: 0 0 2px #0f0, 0 0 4px #0f0;
+}
+
+#terminal {
+  padding: 1ch; /* optional inner padding */
 }
 
 .terminal-line {
@@ -90,31 +94,20 @@ const MOD = 29n;
 const BASE_ALPHABET = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ ,."];
 const CIPHER_TEXT =
 "TGVN,XOWVTHNVA, SDV IGFV OGVNT X,EGFVLSOWNVEHMVHOVPTGVM  O,HWTP.VSVBS,SEHOVISMBHFGVTGVRS,DGEVRHPTV SPTVSOEVTXOWGFVUS,SOAGEVUZVLSHPT.VPTGVAHPZVDOGRVTHNVIHWH,VSOEVLG,PVNSLGFVSPVOHWTP.VGMBPZVNPFGGPNVNHWTGEVSNVTGVEGBSFPGEVP VNGFIGVSVYXHGPVAS,,V LVEXPZ.VS,,GZNVFGMGMUGFGEVTHNVNMH,GVTHNVMGFAZVTHNVNPGG,VFGN I,G.VL FVO RVTGVRSNVW OGVUXPVTHNVBF MHNGVFGMSHOGE.VPTGVM  OVRHPOGNNVSOEVU,GNNGEVTHNVFHWTPG XNVBSPT.";
-
 const ENCRYPTION_KEY = 23n;
 const CORRECT_KEYWORD = "SUNBLOCKER";
 
-// modular inverse function
+// modular inverse
 function modInverse(a, m) {
-  a = BigInt(a);
-  m = BigInt(m);
-  let m0 = m, t, q;
-  let x0 = 0n, x1 = 1n;
-
+  a = BigInt(a); m = BigInt(m);
+  let m0 = m, t, q, x0 = 0n, x1 = 1n;
   if (m === 1n) return 0n;
-
   while (a > 1n) {
-    q = a / m;
-    t = m;
-    m = a % m;
-    a = t;
-    t = x0;
-    x0 = x1 - q * x0;
-    x1 = t;
+    q = a / m; t = m;
+    m = a % m; a = t;
+    t = x0; x0 = x1 - q * x0; x1 = t;
   }
-
   if (x1 < 0n) x1 += m0;
-
   return x1;
 }
 
@@ -144,6 +137,7 @@ const bootLines = [
   "> Log: Please enter correct decryption key and keyword for access..."
 ];
 
+// scale font to fit screen width
 function scaleFont() {
   const temp = document.createElement("span");
   temp.style.position = "absolute";
@@ -159,13 +153,13 @@ function scaleFont() {
 
   document.body.removeChild(temp);
 
-  const viewport = window.innerWidth - 40;
+  const viewportWidth = document.documentElement.clientWidth - 20; // small margin
   const base = 16;
-  const scale = viewport / longest;
-  document.body.style.fontSize =
-    Math.min(base * scale, base) + "px";
+  const scale = viewportWidth / longest;
+  document.body.style.fontSize = Math.min(base * scale, base) + "px";
 }
 
+// render decrypted text
 function renderMessage(text) {
   let block = document.getElementById("message-block");
   if (!block) {
@@ -177,6 +171,7 @@ function renderMessage(text) {
   block.textContent = text;
 }
 
+// main decryption logic
 function update() {
   const keyEl = document.getElementById("user-key");
   const kwEl  = document.getElementById("user-keyword");
@@ -247,13 +242,12 @@ function activateField(span, type) {
   activeField = span;
 
   hiddenInput.type = type === "key" ? "tel" : "text";
-  
-  // clear previous input every time user selects
   hiddenInput.value = "";
   span.textContent = "";
   hiddenInput.focus();
 }
 
+// boot sequence
 async function runBoot() {
   scaleFont();
 
@@ -296,7 +290,7 @@ function enableInputs() {
       const s = document.createElement("span");
       s.id = "user-key";
       s.className = "input-placeholder";
-      s.textContent = "1942"; // placeholder
+      s.textContent = "1942";
       s.onclick = () => activateField(s, "key");
       line.appendChild(s);
     }
@@ -306,7 +300,7 @@ function enableInputs() {
       const s = document.createElement("span");
       s.id = "user-keyword";
       s.className = "input-placeholder";
-      s.textContent = "BAMBOOZLE SWIPE"; // placeholder
+      s.textContent = "BAMBOOZLE SWIPE";
       s.onclick = () => activateField(s, "keyword");
       line.appendChild(s);
     }
@@ -317,6 +311,7 @@ function enableInputs() {
 
 runBoot();
 window.addEventListener("resize", scaleFont);
+window.addEventListener("orientationchange", scaleFont); // mobile fix
 </script>
 
 </body>

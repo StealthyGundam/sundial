@@ -79,19 +79,18 @@ const bootLines = [
   "PROJECT SUNDIAL UNIFIED OPERATING SYSTEM",
   "COPYRIGHT 2026 GUNDAM INDUSTRIES",
   "-Trespasser Management System-",
-  "====================================================",
-  "| Administrator Log:",
+  "====================================================================",
+  "| Administrator Log",
   "| >> Encryption Key: ■■■",
   "| >> Keyword: ■■■■■■■■■■",
-  "====================================================",
   "> run:// calcs E:\\message.txt /P eveveryone:f",
-  "> run:// -encrypt message.txt",
-  "====================================================",
-  "| User Log:",
+  "> -encrypt message.txt",
+  "====================================================================",
+  "| User Log",
   "| >> Decryption Key: ■■■",
   "| >> Keyword: ■■■■■■■■■■",
-  "====================================================",
-  "> LOG: Please enter correct decryption key and keyword for access..."
+  "====================================================================",
+  "> Log: Please enter correct decryption key and keyword for access..."
 ];
 
 /* =========================
@@ -209,7 +208,7 @@ function enableInputs() {
   let userLogStarted = false;
 
   lines.forEach(line => {
-    if (line.textContent.includes("| User Log:")) userLogStarted = true;
+    if (line.textContent.includes("| User Log")) userLogStarted = true;
 
     if (userLogStarted) {
       if (line.textContent.includes("| >> Decryption Key:")) {

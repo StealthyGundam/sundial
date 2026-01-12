@@ -7,34 +7,27 @@
 <title>Gundam Terminal Cipher</title>
 
 <style>
-/* Box model */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
+*, *::before, *::after { box-sizing: border-box; }
 
 html, body {
   margin: 0;
   padding: 0;
   font-family: "Courier New", Courier, monospace;
-  font-variant-ligatures: none;
   background: #010;
   color: #0f0;
   line-height: 1.2;
   user-select: none;
-  overflow-x: hidden;
   text-shadow: 0 0 2px #0f0, 0 0 4px #0f0;
   font-size: 16px;
 }
 
-/* Terminal container fixed at 68 characters */
 #terminal {
   width: 68ch;
   max-width: 100%;
-  padding: 1ch;
   margin: 0 auto;
+  overflow-x: hidden;
 }
 
-/* Terminal lines */
 .terminal-line {
   display: block;
   white-space: pre-wrap;
@@ -43,18 +36,10 @@ html, body {
   animation: flicker 2s infinite alternate;
 }
 
-/* Divider lines never wrap */
-.no-wrap {
-  white-space: pre;
-}
+.no-wrap { white-space: pre; }
 
-/* Centered lines */
-.centered {
-  text-align: center;
-  animation: none;
-}
+.centered { text-align: center; animation: none; }
 
-/* Input placeholders */
 .input-placeholder {
   display: inline-block;
   min-width: 2ch;
@@ -86,8 +71,8 @@ html, body {
 }
 
 @keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+  0%,50% { opacity: 1; }
+  51%,100% { opacity: 0; }
 }
 
 #hidden-input {
@@ -97,7 +82,6 @@ html, body {
 }
 </style>
 </head>
-
 <body>
 
 <div id="terminal"></div>
@@ -230,29 +214,63 @@ function activateField(span, type) {
   hiddenInput.focus();
 }
 
+/* Robust dynamic font scaling */
+function scaleFont() {
+  const chars = 68;
+  const baseFont = 16;
+  if (!terminal) return;
+
+  requestAnimationFrame(() => {
+    const temp = document.createElement("span");
+    temp.textContent = "=".repeat(chars);
+    temp.style.visibility = "hidden";
+    temp.style.position = "absolute";
+    temp.style.whiteSpace = "pre";
+    terminal.appendChild(temp);
+
+    const requiredWidth = temp.getBoundingClientRect().width;
+    terminal.removeChild(temp);
+
+    const viewportWidth = window.innerWidth;
+    let scale = 1;
+    if (requiredWidth > viewportWidth) {
+      scale = viewportWidth / requiredWidth;
+    }
+
+    terminal.style.fontSize = (baseFont * scale) + "px";
+  });
+}
+
 async function runBoot() {
-  for (let i=0;i<3;i++){
-    const s=document.createElement("span");
-    s.className="terminal-line centered";
+  // First three centered lines
+  for (let i = 0; i < 3; i++) {
+    const s = document.createElement("span");
+    s.className = "terminal-line centered";
     s.textContent = bootLines[i];
     terminal.appendChild(s);
   }
 
-  for (let i=3;i<bootLines.length;i++){
-    await new Promise(r=>{
-      const s=document.createElement("span");
-      s.className="terminal-line";
-      if(/^=+$/.test(bootLines[i])) s.classList.add("no-wrap");
+  // Scale font now that terminal exists
+  scaleFont();
+
+  // Append remaining lines with typing effect
+  for (let i = 3; i < bootLines.length; i++) {
+    await new Promise(r => {
+      const s = document.createElement("span");
+      s.className = "terminal-line";
+      if (/^=+$/.test(bootLines[i]) || bootLines[i].startsWith("> Log:")) {
+        s.classList.add("no-wrap");
+      }
       terminal.appendChild(s);
 
-      let j=0;
-      const t=setInterval(()=>{
+      let j = 0;
+      const t = setInterval(() => {
         s.textContent += bootLines[i][j++];
-        if(j>=bootLines[i].length){
+        if (j >= bootLines[i].length) {
           clearInterval(t);
           r();
         }
-      },25);
+      }, 25);
     });
   }
 
@@ -261,29 +279,29 @@ async function runBoot() {
 
 function enableInputs() {
   const lines = terminal.querySelectorAll(".terminal-line");
-  let active=false;
+  let active = false;
 
-  lines.forEach(line=>{
-    if(line.textContent.includes("| User Log")) active=true;
-    if(!active) return;
+  lines.forEach(line => {
+    if (line.textContent.includes("| User Log")) active = true;
+    if (!active) return;
 
-    if(line.textContent.includes("| >> Decryption Key:")){
-      line.textContent="| >> Decryption Key: ";
-      const s=document.createElement("span");
-      s.id="user-key";
-      s.className="input-placeholder";
-      s.textContent="1942";
-      s.onclick=()=>activateField(s,"key");
+    if (line.textContent.includes("| >> Decryption Key:")) {
+      line.textContent = "| >> Decryption Key: ";
+      const s = document.createElement("span");
+      s.id = "user-key";
+      s.className = "input-placeholder";
+      s.textContent = "1942";
+      s.onclick = () => activateField(s, "key");
       line.appendChild(s);
     }
 
-    if(line.textContent.includes("| >> Keyword:")){
-      line.textContent="| >> Keyword: ";
-      const s=document.createElement("span");
-      s.id="user-keyword";
-      s.className="input-placeholder";
-      s.textContent="BAMBOOZLE SWIPE";
-      s.onclick=()=>activateField(s,"keyword");
+    if (line.textContent.includes("| >> Keyword:")) {
+      line.textContent = "| >> Keyword: ";
+      const s = document.createElement("span");
+      s.id = "user-keyword";
+      s.className = "input-placeholder";
+      s.textContent = "BAMBOOZLE SWIPE";
+      s.onclick = () => activateField(s, "keyword");
       line.appendChild(s);
     }
   });
@@ -292,6 +310,7 @@ function enableInputs() {
 }
 
 runBoot();
+window.addEventListener("resize", scaleFont);
 </script>
 
 </body>
